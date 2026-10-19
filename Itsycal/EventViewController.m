@@ -69,6 +69,9 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     NSDatePicker *_startDate, *_endDate, *_repEndDate;
     NSPopUpButton *_repPopup, *_repEndPopup, *_alertPopup, *_calPopup;
     NSArray<NSString *> *_alertAllDayStrings, *_alertRegularStrings;
+    NSMutableArray *_alertLabels, *_alertPopups;
+    NSButton *_addAlertButton;
+    NSLayoutConstraint *_addAlertButtonTopConstraint;
     HackyTextView *_notes;
     NSScrollView *_notesScrollView;
     NSLayoutConstraint *_notesScrollViewHeightConstraint;
@@ -172,7 +175,7 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     [_repEndPopup addItemsWithTitles:@[NSLocalizedString(@"Never", @"Repeat ends never"),
                                        NSLocalizedString(@"On Date", @"")]];
     
-    _alertPopup = popup(NULL);
+    _alertPopup = popup(@selector(alertPopupChanged:));
     _alertAllDayStrings = @[
         NSLocalizedString(@"None", @"Alert none"),
         NSLocalizedString(@"On day of event (9 AM)", @""),
@@ -200,6 +203,10 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     // all-day events as the popup gets wider or narrower.
     [_alertPopup addItemsWithTitles:_alertAllDayStrings];
     [_alertPopup addItemsWithTitles:_alertRegularStrings];
+    _alertLabels = [NSMutableArray arrayWithObject:alertLabel];
+    _alertPopups = [NSMutableArray arrayWithObject:_alertPopup];
+    _addAlertButton = [NSButton buttonWithImage:[NSImage imageNamed:NSImageNameAddTemplate] target:self action:@selector(addAlertClicked:)];
+    [v addSubview:_addAlertButton];
 
     // Notes (NSTextView embedded in NSScrollView)
     _notesScrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 100, 44)];
@@ -249,11 +256,11 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     _saveButton.enabled = NO; // we'll enable when the form is valid.
     NSButton *cancelButton = btn(NSLocalizedString(@"Cancel", @""), self, @selector(cancelOperation:));
     
-    MoVFLHelper *vfl = [[MoVFLHelper alloc] initWithSuperview:v metrics:nil views:NSDictionaryOfVariableBindings(_title, _calPopup, _location, _allDayCheckbox, allDayLabel, startsLabel, endsLabel, _startDate, _endDate, repLabel, alertLabel, _repPopup, _repEndLabel, _repEndPopup, _repEndDate, _alertPopup, _notesScrollView, _url, cancelButton, _saveButton)];
+    MoVFLHelper *vfl = [[MoVFLHelper alloc] initWithSuperview:v metrics:nil views:NSDictionaryOfVariableBindings(_title, _calPopup, _location, _allDayCheckbox, allDayLabel, startsLabel, endsLabel, _startDate, _endDate, repLabel, alertLabel, _repPopup, _repEndLabel, _repEndPopup, _repEndDate, _alertPopup, _addAlertButton, _notesScrollView, _url, cancelButton, _saveButton)];
 
     [vfl :@"V:|-[_title]-[_location]-15-[_allDayCheckbox]"];
     [vfl :@"V:[_allDayCheckbox]-[_startDate]-[_endDate]-[_repPopup]-[_repEndPopup]-[_alertPopup]" :NSLayoutFormatAlignAllLeading];
-    [vfl :@"V:[_alertPopup]-20-[_notesScrollView]-10-[_url]-15-[_saveButton]-|"];
+    [vfl :@"V:[_addAlertButton(==_alertPopup)]-20-[_notesScrollView]-10-[_url]-15-[_saveButton]-|"];
     [vfl :@"H:|-[_title]-[_calPopup]-|" :NSLayoutFormatAlignAllCenterY];
     [vfl :@"H:|-[_location]-|"];
     [vfl :@"H:|-[allDayLabel]-[_allDayCheckbox]-|" :NSLayoutFormatAlignAllBaseline];
@@ -261,10 +268,13 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     [vfl :@"H:|-[endsLabel]-[_endDate]-|" :NSLayoutFormatAlignAllBaseline];
     [vfl :@"H:|-[repLabel]-[_repPopup]-|" :NSLayoutFormatAlignAllBaseline];
     [vfl :@"H:|-[_repEndLabel]-[_repEndPopup]-[_repEndDate]-|" :NSLayoutFormatAlignAllBaseline];
-    [vfl :@"H:|-[alertLabel]-[_alertPopup]-|" :NSLayoutFormatAlignAllBaseline];
+    [vfl :@"H:|-[alertLabel]-[_alertPopup]" :NSLayoutFormatAlignAllBaseline];
+    [vfl :@"H:[_alertPopup]-[_addAlertButton]-|"];
     [vfl :@"H:|-[_notesScrollView(>=200)]-|"];
     [vfl :@"H:|-[_url]-|"];
     [vfl :@"H:[cancelButton]-[_saveButton]-|" :NSLayoutFormatAlignAllCenterY];
+    [_addAlertButton.widthAnchor constraintEqualToAnchor:_addAlertButton.heightAnchor].active = YES;
+    [self updateAddAlertButton];
     
     // Get height of one line in _notes
     [_notes.layoutManager ensureLayoutForTextContainer:_notes.textContainer];
@@ -513,6 +523,45 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
             }
         }
     }
+    while (_alertPopups.count > 1) {
+        [_alertLabels.lastObject removeFromSuperview];
+        [_alertPopups.lastObject removeFromSuperview];
+        [_alertLabels removeLastObject];
+        [_alertPopups removeLastObject];
+    }
+    [self updateAddAlertButton];
+}
+
+- (void)addAlertClicked:(id)sender
+{
+    NSPopUpButton *lastPopup = _alertPopups.lastObject;
+    NSTextField *alertLabel = [NSTextField labelWithString:NSLocalizedString(@"Alert:", @"")];
+    NSPopUpButton *alertPopup = [NSPopUpButton new];
+    alertPopup.target = self;
+    alertPopup.action = @selector(alertPopupChanged:);
+    [alertPopup addItemsWithTitles:_alertPopup.itemTitles];
+    [_alertPopup.superview addSubview:alertLabel];
+    [_alertPopup.superview addSubview:alertPopup];
+    MoVFLHelper *vfl = [[MoVFLHelper alloc] initWithSuperview:_alertPopup.superview metrics:nil views:NSDictionaryOfVariableBindings(lastPopup, alertLabel, alertPopup)];
+    [vfl :@"V:[lastPopup]-[alertPopup]" :NSLayoutFormatAlignAllLeading | NSLayoutFormatAlignAllTrailing];
+    [vfl :@"H:[alertLabel]-[alertPopup]" :NSLayoutFormatAlignAllBaseline];
+    [_alertLabels addObject:alertLabel];
+    [_alertPopups addObject:alertPopup];
+    [self updateAddAlertButton];
+}
+
+- (void)alertPopupChanged:(id)sender
+{
+    [self updateAddAlertButton];
+}
+
+- (void)updateAddAlertButton
+{
+    NSPopUpButton *lastPopup = _alertPopups.lastObject;
+    _addAlertButtonTopConstraint.active = NO;
+    _addAlertButtonTopConstraint = [_addAlertButton.topAnchor constraintEqualToAnchor:lastPopup.topAnchor];
+    _addAlertButtonTopConstraint.active = YES;
+    _addAlertButton.hidden = [lastPopup indexOfItem:lastPopup.selectedItem] == 0;
 }
 
 - (void)saveEvent:(id)sender
@@ -593,8 +642,8 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
         [event removeAlarm:alarm];
     }
     // Set the alert that was selected in the alert popup.
-    NSInteger alertIndex = [_alertPopup indexOfItem:_alertPopup.selectedItem];
-    if (alertIndex > 0) { // 0 == no alert
+    for (NSPopUpButton *alertPopup in _alertPopups) {
+        NSInteger alertIndex = [alertPopup indexOfItem:alertPopup.selectedItem];
         NSTimeInterval offset = MAXFLOAT;
         if (event.isAllDay && alertIndex < kAlertAllDayNumOffsets) {
             offset = kAlertAllDayRelativeOffsets[alertIndex];
