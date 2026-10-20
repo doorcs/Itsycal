@@ -61,6 +61,8 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     -86400,   // 1 day before
     -172800   // 2 days before
 };
+const NSInteger kAlertAllDayIndexForRegular[kAlertRegularNumOffsets] = {0, 1, 1, 1, 1, 1, 1, 1, 2, 3};
+const NSInteger kAlertRegularIndexForAllDay[kAlertAllDayNumOffsets] = {0, 1, 8, 9, 0};
 
 @implementation EventViewController
 {
@@ -446,7 +448,14 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     }
     
     // All-day events have different alert options from regular events.
+    const NSInteger *indexes = allDayCheckbox.state == NSControlStateValueOn ? kAlertAllDayIndexForRegular : kAlertRegularIndexForAllDay;
+    NSMutableOrderedSet<NSNumber *> *alertIndexes = [NSMutableOrderedSet new];
+    for (NSNumber *alertIndex in [self alertIndexesWithoutDefault]) {
+        [alertIndexes addObject:@(indexes[alertIndex.integerValue])];
+    }
+    [alertIndexes removeObject:@0];
     [self populateAlertPopup];
+    [self showAlertIndexesWithDefault:alertIndexes.array];
 }
 
 - (void)startDateChanged:(NSDatePicker *)startPicker
