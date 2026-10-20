@@ -72,6 +72,7 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     NSMutableArray *_alertLabels, *_alertPopups;
     NSButton *_addAlertButton;
     NSLayoutConstraint *_addAlertButtonTopConstraint;
+    NSInteger _defaultAlertIndex;
     HackyTextView *_notes;
     NSScrollView *_notesScrollView;
     NSLayoutConstraint *_notesScrollViewHeightConstraint;
@@ -523,11 +524,20 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
             }
         }
     }
-    while (_alertPopups.count > 1) {
+    _defaultAlertIndex = [_alertPopup indexOfItem:_alertPopup.selectedItem];
+    [self showAlertIndexes:@[@(_defaultAlertIndex)]];
+}
+
+- (void)showAlertIndexes:(NSArray<NSNumber *> *)alertIndexes
+{
+    while (_alertPopups.count > MAX(alertIndexes.count, 1)) {
         [_alertLabels.lastObject removeFromSuperview];
         [_alertPopups.lastObject removeFromSuperview];
         [_alertLabels removeLastObject];
         [_alertPopups removeLastObject];
+    }
+    for (NSUInteger i = 0; i < _alertPopups.count; i++) {
+        [_alertPopups[i] selectItemAtIndex:i < alertIndexes.count ? alertIndexes[i].integerValue : 0];
     }
     [self updateAddAlertButton];
 }
@@ -552,7 +562,22 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
 
 - (void)alertPopupChanged:(id)sender
 {
-    [self updateAddAlertButton];
+    NSMutableArray<NSNumber *> *alertIndexes = [self alertIndexes];
+    [alertIndexes sortUsingSelector:@selector(compare:)];
+    if (alertIndexes.count < _alertPopups.count) {
+        [alertIndexes addObject:@0];
+    }
+    [self showAlertIndexes:alertIndexes];
+}
+
+- (NSMutableArray<NSNumber *> *)alertIndexes
+{
+    NSMutableArray<NSNumber *> *alertIndexes = [NSMutableArray new];
+    for (NSPopUpButton *alertPopup in _alertPopups) {
+        [alertIndexes addObject:@([alertPopup indexOfItem:alertPopup.selectedItem])];
+    }
+    [alertIndexes removeObject:@0];
+    return alertIndexes;
 }
 
 - (void)updateAddAlertButton
