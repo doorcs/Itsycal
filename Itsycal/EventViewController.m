@@ -73,6 +73,7 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     NSButton *_addAlertButton;
     NSLayoutConstraint *_addAlertButtonTopConstraint;
     NSInteger _defaultAlertIndex;
+    BOOL _defaultAlertKept;
     HackyTextView *_notes;
     NSScrollView *_notesScrollView;
     NSLayoutConstraint *_notesScrollViewHeightConstraint;
@@ -355,6 +356,7 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     [_repPopup selectItemAtIndex:0];     // 'None' selected
     [_repEndPopup selectItemAtIndex:0];  // 'Never' selected
     [_alertPopup selectItemAtIndex:0];   // 'None' selected
+    _defaultAlertKept = YES;
     _saveButton.enabled  = NO;
     
     // Function to make colored dots for calendar popup.
@@ -482,7 +484,9 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
 - (void)calPopupChanged:(id)sender
 {
     // Different calendars have different alert options.
+    NSArray<NSNumber *> *alertIndexes = [self alertIndexesWithoutDefault];
     [self populateAlertPopup];
+    [self showAlertIndexesWithDefault:alertIndexes];
 }
 
 - (void)populateAlertPopup
@@ -536,6 +540,9 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
         [_alertLabels removeLastObject];
         [_alertPopups removeLastObject];
     }
+    while (_alertPopups.count < alertIndexes.count) {
+        [self addAlertClicked:nil];
+    }
     for (NSUInteger i = 0; i < _alertPopups.count; i++) {
         [_alertPopups[i] selectItemAtIndex:i < alertIndexes.count ? alertIndexes[i].integerValue : 0];
     }
@@ -567,6 +574,9 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     if (alertIndexes.count < _alertPopups.count) {
         [alertIndexes addObject:@0];
     }
+    if (_defaultAlertIndex > 0 && ![alertIndexes containsObject:@(_defaultAlertIndex)]) {
+        _defaultAlertKept = NO;
+    }
     [self showAlertIndexes:alertIndexes];
 }
 
@@ -578,6 +588,24 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     }
     [alertIndexes removeObject:@0];
     return alertIndexes;
+}
+
+- (NSArray<NSNumber *> *)alertIndexesWithoutDefault
+{
+    NSMutableArray<NSNumber *> *alertIndexes = [self alertIndexes];
+    NSUInteger defaultRow = [alertIndexes indexOfObject:@(_defaultAlertIndex)];
+    if (_defaultAlertKept && defaultRow != NSNotFound) {
+        [alertIndexes removeObjectAtIndex:defaultRow];
+    }
+    return alertIndexes;
+}
+
+- (void)showAlertIndexesWithDefault:(NSArray<NSNumber *> *)alertIndexes
+{
+    if (_defaultAlertKept && _defaultAlertIndex > 0) {
+        alertIndexes = [alertIndexes arrayByAddingObject:@(_defaultAlertIndex)];
+    }
+    [self showAlertIndexes:[alertIndexes sortedArrayUsingSelector:@selector(compare:)]];
 }
 
 - (void)updateAddAlertButton
