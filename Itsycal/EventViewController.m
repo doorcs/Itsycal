@@ -61,6 +61,7 @@ const NSTimeInterval kAlertRegularRelativeOffsets[kAlertRegularNumOffsets] = {
     -86400,   // 1 day before
     -172800   // 2 days before
 };
+// Toggling All-day converts alerts like Calendar.app (0 == no alert).
 const NSInteger kAlertAllDayIndexForRegular[kAlertRegularNumOffsets] = {0, 1, 1, 1, 1, 1, 1, 1, 2, 3};
 const NSInteger kAlertRegularIndexForAllDay[kAlertAllDayNumOffsets] = {0, 1, 8, 9, 0};
 
@@ -578,6 +579,7 @@ const NSInteger kAlertRegularIndexForAllDay[kAlertAllDayNumOffsets] = {0, 1, 8, 
 
 - (void)alertPopupChanged:(id)sender
 {
+    // Sort like Calendar.app, with at most one 'None', at the end.
     NSMutableArray<NSNumber *> *alertIndexes = [self alertIndexes];
     [alertIndexes sortUsingSelector:@selector(compare:)];
     if (alertIndexes.count < _alertPopups.count) {
@@ -611,6 +613,7 @@ const NSInteger kAlertRegularIndexForAllDay[kAlertAllDayNumOffsets] = {0, 1, 8, 
 
 - (void)showAlertIndexesWithDefault:(NSArray<NSNumber *> *)alertIndexes
 {
+    // Add the new default alert if the user kept the old one.
     if (_defaultAlertKept && _defaultAlertIndex > 0) {
         alertIndexes = [alertIndexes arrayByAddingObject:@(_defaultAlertIndex)];
     }
@@ -619,6 +622,8 @@ const NSInteger kAlertRegularIndexForAllDay[kAlertAllDayNumOffsets] = {0, 1, 8, 
 
 - (void)updateAddAlertButton
 {
+    // Keep the add button beside the last row. The notes follow it.
+    // Hide it if that row is 'None'.
     NSPopUpButton *lastPopup = _alertPopups.lastObject;
     _addAlertButtonTopConstraint.active = NO;
     _addAlertButtonTopConstraint = [_addAlertButton.topAnchor constraintEqualToAnchor:lastPopup.topAnchor];
@@ -703,7 +708,7 @@ const NSInteger kAlertRegularIndexForAllDay[kAlertAllDayNumOffsets] = {0, 1, 8, 
     for (EKAlarm *alarm in event.alarms) {
         [event removeAlarm:alarm];
     }
-    // Set the alert that was selected in the alert popup.
+    // Set the alerts that were selected in the alert popups.
     for (NSPopUpButton *alertPopup in _alertPopups) {
         NSInteger alertIndex = [alertPopup indexOfItem:alertPopup.selectedItem];
         NSTimeInterval offset = MAXFLOAT;
